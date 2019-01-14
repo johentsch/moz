@@ -180,29 +180,10 @@ def get_sibling(n,next=True):
             return n.previous_sibling
 
 
-def get_meta(annotations):
-    """Reads the metadata at the beginning of annotation TXT files
 
-    Returns a dictionary with values of all leading lines that have the shape
-    ``@key: value``, such as ``@meter: 4/4``
-
-    Parameters
-    ----------
-
-    annotations: str
-        Path to the TXT file
-    """
-    with open(annotations,'r') as file:
-        line = file.readline()
-        meta = {}
-        while line[0] == '@':
-            lst = line.strip().split(': ')
-            meta[lst[0]] = lst[1]
-            line = file.readline()
-    return meta
 
 def beat2float(beat):
-    """Converts a beat in the form ``2.1/3`` to a float
+    """Converts a quarter beat in the form ``2.1/3`` to a float
     """
     if isinstance(beat,float):
         return beat
@@ -212,6 +193,25 @@ def beat2float(beat):
     if len(split) > 1:
         val += float(Fraction(split[1]))
     return val
+
+def tick2beat(tick,beatsize=4):
+    """Converts an onset in ticks into the format ``2.1/3``
+
+    Parameters
+    ----------
+    tick: int
+        Onset to be converted
+    beatsize: int, optional
+        pass 4 for quarter beats, 8 for eights beats and so on
+    """
+    tick = int(tick)
+    beatsize=int(1920/beatsize)
+    beat = str(tick // beatsize +1)
+    if tick % beatsize > 0:
+        subbeat = Fraction((tick % 480)/480).limit_denominator(128)
+        beat = str(beat) + '.' + str(subbeat)
+    return beat
+
 
 
 class Piece():
@@ -984,7 +984,7 @@ class Piece():
         self = self.__init__(filename)
         return pretty_markup
 
-    def get_harmonies(self,only_wrong=False,b='beats',keys=False,include_voltas=False):
+    def get_harmonies(self,only_wrong=False,b=4,keys=False,include_voltas=False):
         """Returns a list of lists with all harmonies and their positions.
 
         Parameters
@@ -992,8 +992,9 @@ class Piece():
 
         only_wrong: bool, optional
             Set True if you are checking for syntactic errors in the labels.
-        b: {'beat','tick'}, optional
-            Pass 'tick' if your passing ticks as beats
+        b: int or 'ticks', optional
+            Pass 'ticks' if you want to get the positions in tick instead of beats.
+            Otherwise, to get beats other than quarter beats, pass b=8 for eighth beats, for example
         keys: bool, optional
             Extend the harmonies' lists by their local key and applied key.
         include_voltas: bool, optional
@@ -1040,11 +1041,8 @@ class Piece():
             for tick, harmony in measure['harmonies'].items():
                 if b == 'ticks':
                     beat = int(tick) if type(tick) == float and tick.is_integer() else tick
-                elif b == 'beats':
-                    beat = str(tick // 480 +1)
-                    if tick % 480 > 0:
-                        subbeat = Fraction((tick % 480)/480).limit_denominator(128)
-                        beat = str(beat) + '.' + str(subbeat)
+                else:
+                    beat = tick2beat(tick,b)
 
                 if only_wrong:
                     alternatives = harmony.split('-')
@@ -1232,3 +1230,5 @@ class Piece():
         except:
             print(f"created {createdfiles} in {dir}")
 ########################################### End of Class Piece
+p = Piece('/home/laser/Code/mozartkadenzen/Harmonic Annotations/K331-1.mscx')
+p.get_harmonies(b=8)
